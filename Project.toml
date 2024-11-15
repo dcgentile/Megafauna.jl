@@ -1,0 +1,13 @@
+name = "Megafauna"
+uuid = "acce3a02-0e32-41b8-bb90-7402d3d41f55"
+authors = ["David Gentile", "Joshua Huang"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.6.7"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
