@@ -1,5 +1,7 @@
 module Megafauna
 
-# Write your package code here.
+greetings() = println("Welcome to Megafauna")
+
+export greetings
 
 end
