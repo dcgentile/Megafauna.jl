@@ -1,40 +1,22 @@
 using Distributed
-using ProgressMeter
 using OptimalTransport
 using Distributions
 using Distances
-include("./DPC.jl")
 
-function compute_metric_wasserstein_derivative(x, W, c)
-    N = size(x,1)
-    D = size(x,2)
-    distances = zeros(N,D)
-    for d in 1:D
-        w = W[d]
-        @showprogress @distributed for t in w+1:N-w
-            slice_left = unique(x[t-w:t-1,:])
-            slice_right = unique(x[t:t+w-1,:])
-            len_left = length(slice_left)
-            len_right = length(slice_right)
-            p = fill(1/len_left,len_left)
-            q = fill(1/len_right, len_right)
-            μ = DiscreteNonParametric(slice_left, p)
-            ν = DiscreteNonParametric(slice_right, q)
-            distances[t, d] = ot_cost(c, μ, ν)^2
-        end
+
+
+function lazy_gradient(x)
+    N = length(x)
+    grad = zeros(N)
+    for t in 2:N-1
+        grad[t] = 0.5 * (x[t+1] - x[t - 1])
     end
-    return distances
+
+    grad[1] = x[2] - x[1]
+    grad[end] = x[end] - x[end-1]
+    return grad
 end
 
-function enumerate_change_points(distances, q)
-    change_points = Vector{Int64}()
-    D = size(distances, 2)
-    for d in 1:D
-        inflections = find_inflections(distances[:,d], q[d])
-        append!(change_points, inflections)
-    end
-    return sort!(unique!(change_points))
-end
 
 function find_inflections(distances, q)
     T = size(distances,1)
@@ -72,24 +54,53 @@ function find_inflections(distances, q)
     return sort!(cps)
 end
 
-function lazy_gradient(x)
-    N = length(x)
-    grad = zeros(N)
-    for t in 2:N-1
-        grad[t] = 0.5 * (x[t+1] - x[t - 1])
-    end
 
-    grad[1] = x[2] - x[1]
-    grad[end] = x[end] - x[end-1]
-    return grad
+function compute_metric_wasserstein_derivative(x, W, c)
+    N = size(x,1)
+    D = size(x,2)
+    distances = zeros(N,D)
+    for d in 1:D
+        w = W[d]
+        @sync @distributed for t in w+1:N-w
+            slice_left = unique(x[t-w:t-1,:])
+            slice_right = unique(x[t:t+w-1,:])
+            len_left = length(slice_left)
+            len_right = length(slice_right)
+            p = fill(1/len_left,len_left)
+            q = fill(1/len_right, len_right)
+            μ = DiscreteNonParametric(slice_left, p)
+            ν = DiscreteNonParametric(slice_right, q)
+            distances[t, d] = ot_cost(c, μ, ν)^2
+        end
+    end
+    return distances
 end
 
 
-function compute_change_points(x, q, W, c=sqeuclidean)
-    distances = compute_metric_wasserstein_derivative(x, W, c)
-    cps = enumerate_change_points(distances, q)
+function enumerate_change_points(distances, q)
+    change_points = Vector{Int64}()
+    D = size(distances, 2)
+    for d in 1:D
+        inflections = find_inflections(distances[:,d], q[d])
+        append!(change_points, inflections)
+    end
+    return sort!(unique!(change_points))
+end
+
+
+function compute_change_points(x, Q, W)
+    distances = compute_metric_wasserstein_derivative(x, W, sqeuclidean)
+    cps = enumerate_change_points(distances, Q)
     return cps
 end
+
+function compute_change_points_periodic(X, Q, W)
+    c(x,y) = peuclidean(x,y,1.0)
+    distances = compute_metric_wasserstein_derivative(x, W, peuclidean(;p=1))
+    cps = enumerate_change_points(distances, Q)
+    return cps
+end
+
 
 function label_series(x, cps, labels)
     T = length(cps)
@@ -103,5 +114,8 @@ function label_series(x, cps, labels)
     return point_labels
 end
 
-
 export compute_change_points, label_series
+
+X = rand(Uniform(0, 3), 100000)
+X_cps = compute_change_points(X, [0.9], [200])
+println(length(X_cps))

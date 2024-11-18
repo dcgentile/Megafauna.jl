@@ -3,7 +3,6 @@ using Distributed
 using SharedArrays
 using OptimalTransport
 using Statistics
-using DelimitedFiles
 using Distributions
 using Distances
 using Integrals

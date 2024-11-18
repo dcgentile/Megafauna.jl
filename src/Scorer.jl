@@ -10,17 +10,7 @@ Process summary:
 8: VAMP2 score on singular values
 """
 
-using Distances
-using Distributed
-using DelimitedFiles
-using ProgressMeter
-using Plots
 using LinearAlgebra
-using DataFrames
-using CSV
-include("ChangePoints.jl")
-include("LinearEntropicTransport.jl")
-include("DPC.jl")
 
 function construct_counts_matrix(labels, lag_time)
     unique_labels = unique(labels)
@@ -79,7 +69,8 @@ end
 function score_labeling(labels, lag_time)
     C = construct_counts_matrix(labels, lag_time)
     X = fixed_point_iteration(C)
-    score = sum(get_singular_values(X) .^2)
+    #score = sum(get_singular_values(X) .^2)
+    score = norm(X)^2
     return score
 end
 
