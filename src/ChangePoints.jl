@@ -96,7 +96,7 @@ end
 
 function compute_change_points_periodic(X, Q, W)
     c(x,y) = peuclidean(x,y,1.0)
-    distances = compute_metric_wasserstein_derivative(x, W, peuclidean(;p=1))
+    distances = compute_metric_wasserstein_derivative(X, W, c)
     cps = enumerate_change_points(distances, Q)
     return cps
 end
