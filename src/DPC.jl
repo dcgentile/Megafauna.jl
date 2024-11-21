@@ -1,13 +1,8 @@
 using Base.Threads
 using Distributed
 using SharedArrays
-using OptimalTransport
 using Statistics
-using Distributions
 using Distances
-using Integrals
-using Plots
-using LinearAlgebra
 
 function select_dc(dists)
     """

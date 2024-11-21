@@ -2,6 +2,7 @@ using Distributed
 using OptimalTransport
 using Distributions
 using Distances
+using DataFrames
 
 
 
@@ -95,12 +96,28 @@ function compute_change_points(x, Q, W)
 end
 
 function compute_change_points_periodic(X, Q, W)
-    c(x,y) = peuclidean(x,y,1.0)
+    c(x,y) = peuclidean(x,y,1.0)^2
     distances = compute_metric_wasserstein_derivative(X, W, c)
     cps = enumerate_change_points(distances, Q)
     return cps
 end
 
+function filter_change_points_from_labels(X, cps, labels)
+    N = length(labels)
+    T = size(X,1)
+    filtered_cps = [1]
+    filtered_labels = [labels[1]]
+    for i=1:N-1
+        curr = labels[i]
+        nx = labels[i+1]
+	    if nx != curr
+            push!(filtered_cps, cps[i])
+            push!(filtered_labels, labels[i])
+        end
+    end
+    push!(filtered_cps, T)
+    return filtered_cps, filtered_labels
+end
 
 function label_series(x, cps, labels)
     T = length(cps)
@@ -114,8 +131,4 @@ function label_series(x, cps, labels)
     return point_labels
 end
 
-export compute_change_points, label_series
-
-X = rand(Uniform(0, 3), 100000)
-X_cps = compute_change_points(X, [0.9], [200])
-println(length(X_cps))
+export compute_change_points, label_series, filter_change_points_from_labels

@@ -1,4 +1,5 @@
 using Plots
+using DataFrames
 
 function plot_ramachandran(x, cps, labels, title, fname, height=1000)
     n_clusters = length(unique(labels))
@@ -50,4 +51,16 @@ function plot_timeseries(x, cps, labels, title, fname, width=3000, height=500)
     end
     plot!(legend=false, title=title)
     savefig(p, "$(fname)")
+end
+
+function plot_backbone_angle(df, title, fname="plot.pdf")
+    # assumes the data is 1D (only one backbone angle) and normalized to lie in (-1,1)
+    gr()
+    p = plot()
+    df[!, "x"] = [cos(π * t) for t in df[!,"position"]]
+    df[!, "y"] = [sin(π * t) for t in df[!,"position"]]
+    scatter!(p, df.x, df.y, color=ifelse(df.label. "blue", "red"), markersize=0.5)
+    plot!(legend=false, title=title)
+    savefig(p, "$fname")
+
 end

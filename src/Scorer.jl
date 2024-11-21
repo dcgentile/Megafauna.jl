@@ -62,8 +62,8 @@ function fixed_point_iteration(C, tol=1e-5, max_iter=10000, verbose=false)
 end
 
 function get_singular_values(matrix)
-    S = svd(matrix).S
-    return S
+    #S = svd(matrix).S
+    return norm(matrix, 2)
 end
 
 function score_labeling(labels, lag_time)

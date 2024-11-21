@@ -6,6 +6,63 @@ using Distributions
 using Distributed
 using Integrals
 
+function gather_entropic_maps_presampled(X, cps, ε, spt_μ, c)
+    entropic_maps = Function[]
+    N = length(cps)
+    μ = fill(1/size(spt_μ,1),size(spt_μ, 1))
+    for i in 1:N-1
+        t0, t1 = cps[i], cps[i+1]
+        n = t1 - t0 + 1
+        spt_ν = X[t0:t1,:]
+        C = c(spt_μ', spt_ν')
+        ν = fill(1/n,n)
+        T = entropic_transport_map(μ, ν, spt_ν, C, ε, SinkhornGibbs())
+        push!(entropic_maps, T)
+    end
+    return entropic_maps
+end
+
+
+function linear_entropic_transport_presampled(Ti, Tj, μ)
+    N = size(μ, 1)
+	f(x) = sqeuclidean(Ti(x), Tj(x))
+    return (sum(mapslices(f, μ; dims=2)) / N)^0.5
+end
+
+function pairwise_linear_entropic_dists_presampled(entropic_maps, μ)
+    N = size(entropic_maps, 1)
+    A = zeros(N,N)
+    p = Progress((N*(N - 1)) ÷ 2)
+    for i in 1:N
+        Ti = entropic_maps[i]
+        for j in i:N
+            Tj = entropic_maps[j]
+            d = linear_entropic_transport_presampled(Ti, Tj, μ)
+            A[i,j] = d
+            A[j,i] = d
+            next!(p)
+        end
+    end
+    return A
+
+end
+
+
+function linear_entropic_segment_distances_periodic_presampled(X, cps, ε, ρ::Distributions.Distribution, N=1000)
+    c(X, Y) = pairwise(PeriodicEuclidean([1,1]), X, Y).^2
+    spt_μ = rand(ρ, N)
+    entropic_maps = gather_entropic_maps_presampled(X, cps, ε, spt_μ', c)
+    return pairwise_linear_entropic_dists_presampled(entropic_maps, spt_μ')
+end
+
+function linear_entropic_segment_distances_presampled(X, cps, ε, ρ::Distributions.Distribution, N=1000)
+    c(X, Y) = pairwise(SqEuclidean(), X, Y).^2
+    spt_μ = rand(ρ, N)
+    println(size(spt_μ))
+    entropic_maps = gather_entropic_maps_presampled(X, cps, ε, spt_μ, c)
+    return pairwise_linear_entropic_dists_presampled(entropic_maps, spt_μ')
+end
+
 function gather_entropic_maps(x, cps, ε, ρ::Distributions.Distribution, c)
     entropic_maps = Vector{Function}()
     N = length(cps)
@@ -26,21 +83,21 @@ function gather_entropic_maps(x, cps, ε, ρ::Distributions.Distribution, c)
 
 end
 
-function linear_entropic_transport_QGKJL(Ti, Tj)
+function linear_entropic_transport_QGKJL(Ti, Tj, dom=(-2,2))
     f(x, p) = (Ti([x]) - Tj([x]))^2
-    i = solve(IntegralProblem(f, (-2,2)), QuadGKJL()).u
-    return i
+    i = solve(IntegralProblem(f, dom), QuadGKJL()).u
+    return i^0.5
 end
 
-function linear_entropic_transport(Ti, Tj)
+function linear_entropic_transport(Ti, Tj, domain)
     f(u, p) = sqeuclidean(Ti(u), Tj(u))
-    domain = ([0,0], [1,1])
     prob = IntegralProblem(f, domain)
     sol = solve(prob, HCubatureJ())
     return sol.u
 end
 
-function pairwise_linear_entropic_dists(entropic_maps)
+
+function pairwise_linear_entropic_dists_1d(entropic_maps)
     N = size(entropic_maps, 1)
     A = zeros(N,N)
     p = Progress((N*(N - 1)) ÷ 2)
@@ -57,14 +114,15 @@ function pairwise_linear_entropic_dists(entropic_maps)
     return A
 end
 
-function linear_entropic_segment_distances(X, cps, ε, ρ::Distributions.Distribution, cost=SqEuclidean())
-    c(X,Y) = pairwise(cost, X,Y)
+
+function linear_entropic_segment_distances_1d(X, cps, ε, ρ::Distributions.Distribution)
+    c(X,Y) = pairwise(SqEuclidean(), X,Y)
     entropic_maps = gather_entropic_maps(X, cps, ε, ρ, c)
-    return pairwise_linear_entropic_dists(entropic_maps)
+    return pairwise_linear_entropic_dists_1d(entropic_maps)
 end
 
 
-function entropic_segment_distances(x, cps, c, ε)
+function pairwise_entropic_segment_distances(x, cps, c, ε)
     N = size(cps, 1) - 1
     A = zeros(N,N)
     p = Progress(N*(N - 1) ÷ 2; dt=1.0)
@@ -86,7 +144,7 @@ function entropic_segment_distances(x, cps, c, ε)
     return A
 end
 
-function pairwise_transport_1d(x, cps)
+function pairwise_transport_1d(x, cps, c=sqeuclidean)
     N = size(cps, 1) - 1
     A = zeros(N,N)
     #p = Progress((N*(N - 1)) ÷ 2)
@@ -102,7 +160,8 @@ function pairwise_transport_1d(x, cps)
             len_j = length(Sj)
             q = fill(1/len_j, len_j)
             ν = DiscreteNonParametric(Sj, q)
-            d = wasserstein(μ, ν; p=2)^2
+            d = ot_cost(c, μ, ν)^2
+            #d = wasserstein(μ, ν; p=2)^2
             A[i,j] = d
             A[j,i] = d
     #        next!(p)
@@ -112,7 +171,5 @@ function pairwise_transport_1d(x, cps)
 
 end
 
-export get_segment_potentials
-export gather_entropic_maps
 export linear_entropic_segment_distances
-export pairwise_transport_1d
+export linear_entropic_segment_distances_presampled
