@@ -62,15 +62,14 @@ function fixed_point_iteration(C, tol=1e-5, max_iter=10000, verbose=false)
 end
 
 function get_singular_values(matrix)
-    #S = svd(matrix).S
-    return norm(matrix, 2)
+    S = svd(matrix).S
+    return S
 end
 
 function score_labeling(labels, lag_time)
     C = construct_counts_matrix(labels, lag_time)
     X = fixed_point_iteration(C)
-    #score = sum(get_singular_values(X) .^2)
-    score = norm(X)^2
+    score = sum(get_singular_values(X) .^2)
     return score
 end
 

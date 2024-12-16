@@ -4,7 +4,7 @@ using SharedArrays
 using Statistics
 using Distances
 
-function select_dc(dists)
+function select_dc(dists, q=0.98)
     """
     Given a distance matrix, get the 2nd percentile of all distances
 
@@ -19,6 +19,9 @@ function select_dc(dists)
     position = Int(floor(N * (N - 1) * percent / 100))
     dc = sort(tt)[position + N]
     return dc
+    #N = size(dists, 1)
+    #arr = reshape(dists, N^2)
+    #return quantile(arr, q)
 end
 
 function get_density(dists, dc; method::Union{Nothing, Symbol} = nothing)
@@ -133,7 +136,7 @@ end
 
 function updated_density_estimate(dists, regions, dc)
     xx = get_xx(dists, regions)
-    println("xx shape: $(size(xx))")
+    #println("xx shape: $(size(xx))")
 
     N = size(dists, 1)  # Number of data points
     dist = zeros(Float64, N, N)
@@ -161,7 +164,7 @@ function updated_density_estimate(dists, regions, dc)
         end
     end
 
-    println("rho size: ", size(rho))
+    #println("rho size: ", size(rho))
     return rho
 end
 
@@ -173,7 +176,7 @@ end
 function get_clusters(data, cps, distances, n_clusters)
     states = split_data_by_change_points(data, cps)
     alternate_dc = select_dc(distances)
-    print(alternate_dc)
+    println(alternate_dc)
     rho = updated_density_estimate(distances, states, alternate_dc)
     deltas, nearest_neighbor = get_deltas(distances,rho)
     centers=find_centers_K(rho, deltas, n_clusters)

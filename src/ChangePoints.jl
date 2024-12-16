@@ -2,7 +2,6 @@ using Distributed
 using OptimalTransport
 using Distributions
 using Distances
-using DataFrames
 
 
 
@@ -20,6 +19,7 @@ end
 
 
 function find_inflections(distances, q)
+    println("finding inflections")
     T = size(distances,1)
     grad = lazy_gradient(distances)
     cutoff = quantile(distances,q)
@@ -52,6 +52,7 @@ function find_inflections(distances, q)
             push!(cps, argmax(sequence) + seq_start)
         end
     end
+    println("finished finding inflection")
     return sort!(cps)
 end
 
@@ -60,6 +61,8 @@ function compute_metric_wasserstein_derivative(x, W, c)
     N = size(x,1)
     D = size(x,2)
     distances = zeros(N,D)
+    println("computing metric wasserstein derivative")
+    println("Data Matrix Dims = $((N, D))")
     for d in 1:D
         w = W[d]
         @sync @distributed for t in w+1:N-w
@@ -74,13 +77,31 @@ function compute_metric_wasserstein_derivative(x, W, c)
             distances[t, d] = ot_cost(c, μ, ν)^2
         end
     end
+    println("finished computing metric derivative")
     return distances
 end
 
+function compute_entropic_metric_wasserstein_derivative(x, w, ε, c)
+    N = size(x,1)
+    distances = zeros(N)
+    @sync @distributed for t in w+1:N-w
+        slice_left = x[t-w:t-1,:]
+        slice_right = x[t:t+w-1,:]
+        len_left = length(slice_left)
+        len_right = length(slice_right)
+        p = fill(1/len_left,len_left)
+        q = fill(1/len_right, len_right)
+        C = c(slice_left, slice_right)
+        distances[t] = sinkhorn2(p, q, C, ε)
+    end
+    return distances
+end
 
 function enumerate_change_points(distances, q)
     change_points = Vector{Int64}()
     D = size(distances, 2)
+    println("enumerating change points")
+    println("number of dimensions: $(D)")
     for d in 1:D
         inflections = find_inflections(distances[:,d], q[d])
         append!(change_points, inflections)
