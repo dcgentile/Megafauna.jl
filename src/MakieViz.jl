@@ -1,3 +1,4 @@
+using Dates
 using CairoMakie
 using KernelDensity
 
@@ -87,6 +88,7 @@ function plot_ramachandran(X, point_labels, title, fname, height=1000, density=t
             kernel = kde(cluster)
             colors = [pdf(kernel, cluster[k,1], cluster[k,2]) for k in 1:K]
             scatter!(ax, cluster; color=colors, colormap=cmap, markersize=markersize)
+            current_figure()
         else
             scatter!(ax, cluster; color=point_labels, colormap=Makie.Categorical(cmap), markersize=markersize, alpha=alpha)
         end
@@ -96,4 +98,49 @@ function plot_ramachandran(X, point_labels, title, fname, height=1000, density=t
     save(fname, fig)
 end
 
+function ramachandran(X, point_labels, title, fname; width=1000, density=true, cmap=:darktest, ext="png", step=5)
+    #fig = Figure(size = (2*width, 4*width))
+    labels = unique(point_labels)
+    markersize=5
+    alpha=0.95
+    time = Dates.format(now(),"yy-mm-dd-HH-MM-SS")
+    img_folder_path = "img-$(time)"
+    mkdir(img_folder_path)
+    for (idx, label) in enumerate(labels)
+        fig = Figure(size=(width, width))
+        println("plotting cluster $(idx)")
+        f = fig[1,1]
+        fcb = fig[1, 2]
+        indices = findall(x->x==label, point_labels)
+        cluster = X[indices,:]
+
+        K = size(cluster,1)
+        sample_size = size(cluster, 1)
+        proportion = sample_size / size(X, 1)
+        ax = Axis(f, xlabel="ψ", ylabel="φ", limits=(0,1,0,1), title="Cluster $(idx)\nSamples: $(sample_size)\nProportion of Timeseries: $(proportion)")
+        if density
+            kernel = kde(cluster)
+            colors = [pdf(kernel, cluster[k,1], cluster[k,2]) for k in 1:K]
+            Colorbar(fcb, limits = (minimum(colors), maximum(colors)), colormap = cmap ,flipaxis = false)
+            scatter!(ax, cluster; color=colors, colormap=cmap, markersize=markersize)
+            #if K > 10000
+                #scatter!(ax, cluster[begin:5:end,:]; color=colors[begin:5:end], colormap=cmap, markersize=markersize)
+            #else
+                #scatter!(ax, cluster; color=colors, colormap=cmap, markersize=markersize)
+            #end
+        else
+            scatter!(ax, cluster; color=point_labels, colormap=Makie.Categorical(cmap), markersize=markersize, alpha=alpha)
+        end
+        save("$(img_folder_path)/$(fname)-cluster-$(idx).$(ext)", fig)
+    end
+    fig = Figure(size=(width, width))
+    ax = Axis(fig[1,1], title=title, xlabel="ψ", ylabel="φ", limits=(0,1,0,1))
+    scatter!(ax, X[begin:end,:]; color=point_labels[begin:end], colormap=Makie.Categorical(cmap), markersize=markersize, alpha=alpha)
+    save("$(img_folder_path)/$(fname)-ensemble.$(ext)", fig)
+
+
+end
+
 export plot_sing_backbone, plot_timeseries, plot_ramachandran
+
+export ramachandran

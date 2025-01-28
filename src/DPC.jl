@@ -3,6 +3,7 @@ using Distributed
 using SharedArrays
 using Statistics
 using Distances
+using ProgressMeter
 
 function select_dc(dists, q=0.98)
     """
@@ -72,7 +73,7 @@ function get_deltas(dists, rho)
 end
 
 
-function find_centers_K(rho, deltas, K)
+function find_centers_K(ρ, δ, K)
     """
     Get segments that represent cluster centers
 
@@ -83,8 +84,11 @@ function find_centers_K(rho, deltas, K)
     Returns:
         Vector{Int} : an array of trajectory segments representing cluster centers
     """
-    rho_delta = rho .* deltas
-    centers = sortperm(rho_delta, rev=true)
+    ρδ = ρ .* δ
+    centers = sortperm(ρδ, rev=true)
+    fig = Figure()
+    scatter!(Axis(fig[1,1]), collect(1:length(ρ)), sort!(ρδ))
+    save("gamma-curve.pdf", fig)
     return centers[1:K]
 end
 
@@ -121,11 +125,13 @@ end
 function get_xx(dists, regions)
     N = size(dists, 1)
     new_dist_mtx = Vector{Vector{Float64}}()
+    prog = Progress((N*(N - 1)) ÷ 2)
 
     # Iterate over the upper triangular part of the matrix (i < j)
     for i in 1:N-1
         for j in i+1:N
             push!(new_dist_mtx, [i, j, dists[i, j], length(regions[i]), length(regions[j])])
+            next!(prog)
         end
     end
 
@@ -177,10 +183,13 @@ function get_clusters(data, cps, distances, n_clusters)
     states = split_data_by_change_points(data, cps)
     alternate_dc = select_dc(distances)
     println(alternate_dc)
-    rho = updated_density_estimate(distances, states, alternate_dc)
-    deltas, nearest_neighbor = get_deltas(distances,rho)
-    centers=find_centers_K(rho, deltas, n_clusters)
-    labels = cluster_PD(rho, centers, nearest_neighbor)
+    ρ = updated_density_estimate(distances, states, alternate_dc)
+    δ, nearest_neighbor = get_deltas(distances,ρ)
+    centers=find_centers_K(ρ, δ, n_clusters)
+    labels = cluster_PD(ρ, centers, nearest_neighbor)
+    fig = Figure()
+    scatter!(Axis(fig[1,1]), ρ, δ)
+    save("decision-graph.pdf", fig)
     return labels
 end
 
