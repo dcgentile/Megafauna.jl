@@ -2,24 +2,6 @@ using Dates
 using CairoMakie
 using KernelDensity
 
-function example()
-	n = 1000;
-    x = 1:n;
-    y = sin.(collect(x) .* 0.05);
-    z = vcat(1:n/2, n/2:-1:1) .- n/4
-
-    colorrange = [-n/4, n/4];
-
-    cmap = :balance
-
-    fig = Figure()
-
-    scatter(fig[1,1], x, y; color=z, colormap = cmap, markersize=10, strokewidth=0, colorrange=colorrange)
-    Colorbar(fig[1,2], colorrange=colorrange, colormap=cmap, label="Colored Data")
-    fig
-    save("fig.pdf", fig)
-end
-
 function plot_sing_backbone(X, point_labels, cmap=:darktest)
     fig = Figure(size = (1000, 7000))
     x = [cos(π*t) for t in X]
@@ -36,12 +18,12 @@ function plot_timeseries(X, cps, point_labels, title, fname, cmap=:darktest)
     save(fname, fig)
 end
 
-function scatter_timeseries(X, cps, point_labels, title, fname, cmap=:darktest)
+function scatter_timeseries(X, cps, point_labels, title, cmap=:darktest)
     fig = Figure(size=(3000,500))
     ax = Axis(fig[1,1], title=title, xlabel="t", ylabel="x(t)")
     scatter!(ax, 1:size(X,1), X[:,1], color=point_labels, colormap=Makie.Categorical(cmap))
     vlines!(cps, linestyle=:dash)
-    save(fname, fig)
+    return fig
 end
 
 function plot_changes(X, cps, title, fname, cmap=:darktest)

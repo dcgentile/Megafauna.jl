@@ -19,11 +19,10 @@ end
 
 
 function find_inflections(distances, q)
-    println("finding inflections")
     T = size(distances,1)
     grad = lazy_gradient(distances)
     cutoff = quantile(distances,q)
-    candidates = Vector{Int64}()
+    candidates = []
     for t in 1:T
         if distances[t] > cutoff
             append!(candidates, t)
@@ -35,7 +34,6 @@ function find_inflections(distances, q)
     seq_start = 0
     cps = [1, T]
     N = length(candidates)
-
     for n in 1:N-1
         nx = candidates[n+1]
         curr = candidates[n]
@@ -44,7 +42,7 @@ function find_inflections(distances, q)
             seq_start = curr
         end
 
-        if in_sequence && nx - curr > 1
+        if (in_sequence && nx - curr > 1) || n == N - 1
             in_sequence = false
             seq_end = curr
             sequence = grad[seq_start:seq_end]
@@ -52,7 +50,6 @@ function find_inflections(distances, q)
             push!(cps, argmax(sequence) + seq_start)
         end
     end
-    println("finished finding inflection")
     return sort!(cps)
 end
 
@@ -61,8 +58,6 @@ function compute_metric_wasserstein_derivative(x, W, c)
     N = size(x,1)
     D = size(x,2)
     distances = zeros(N,D)
-    println("computing metric wasserstein derivative")
-    println("Data Matrix Dims = $((N, D))")
     for d in 1:D
         w = W[d]
         @sync @distributed for t in w+1:N-w
@@ -77,7 +72,6 @@ function compute_metric_wasserstein_derivative(x, W, c)
             distances[t, d] = ot_cost(c, μ, ν)^2
         end
     end
-    println("finished computing metric derivative")
     return distances
 end
 
@@ -152,4 +146,4 @@ function label_series(x, cps, labels)
     return point_labels
 end
 
-export compute_change_points, label_series, filter_change_points_from_labels
+export compute_change_points, label_series, filter_change_points_from_labels, compute_metric_wasserstein_derivative

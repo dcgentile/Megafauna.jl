@@ -25,28 +25,6 @@ function select_dc(dists, q=0.98)
     #return quantile(arr, q)
 end
 
-function get_density(dists, dc; method::Union{Nothing, Symbol} = nothing)
-    """
-    Kernel density estimator
-
-    Args:
-        dists : square matrix of pairwise segment distances
-        dc    : distance cutoff
-    Returns:
-        Array{Float64, 1} : array of relative densities of each trajectory segment
-    """
-    N = size(dists, 1)
-    rho = zeros(Float64, N)
-    for i in 1:N
-        if method === nothing
-            rho[i] = sum(dists[i, :] .< dc) - 1
-        else
-            rho[i] = sum(exp.(-((dists[i, :] ./ dc) .^ 2))) - 1
-        end
-    end
-    return rho
-end
-
 function get_deltas(dists, rho)
     N = size(dists, 1)
     @assert length(rho) == N "Length of rho must match dimensions of dists"
@@ -86,9 +64,9 @@ function find_centers_K(ρ, δ, K)
     """
     ρδ = ρ .* δ
     centers = sortperm(ρδ, rev=true)
-    fig = Figure()
-    scatter!(Axis(fig[1,1]), collect(1:length(ρ)), sort!(ρδ))
-    save("gamma-curve.pdf", fig)
+    #fig = Figure()
+    #scatter!(Axis(fig[1,1], title="Sorted γ Values", xlabel="Rank", ylabel="ρ ⋅ δ"), collect(1:length(ρ)), sort!(ρδ))
+    #save("gamma-curve.pdf", fig)
     return centers[1:K]
 end
 
@@ -140,6 +118,11 @@ function get_xx(dists, regions)
     return xx
 end
 
+
+# ρ[j] = ∑_{i != j} |S_i| d_ij
+
+
+
 function updated_density_estimate(dists, regions, dc)
     xx = get_xx(dists, regions)
     #println("xx shape: $(size(xx))")
@@ -157,9 +140,11 @@ function updated_density_estimate(dists, regions, dc)
         density[ii] = xx[i, 4]
         density[jj] = xx[i, 5]
     end
-
+    # density is a vector of length N and density[i] = length(seg i)
     # Initialize rho with a copy of density
     rho = copy(density)
+    #init ρ = size of segments
+
 
     # Update rho values using the Gaussian kernel
     for i in 1:N-1
@@ -169,6 +154,7 @@ function updated_density_estimate(dists, regions, dc)
             rho[j] += density[i] * gaussian_kernel
         end
     end
+    # OUT ρ[k] = length(seg[k]) + ∑_{i < k} gaussian_kernel[i,k] + ∑_{i > k} length(seg[i])*gaussian_kernel[k,i]
 
     #println("rho size: ", size(rho))
     return rho
@@ -187,9 +173,10 @@ function get_clusters(data, cps, distances, n_clusters)
     δ, nearest_neighbor = get_deltas(distances,ρ)
     centers=find_centers_K(ρ, δ, n_clusters)
     labels = cluster_PD(ρ, centers, nearest_neighbor)
-    fig = Figure()
-    scatter!(Axis(fig[1,1]), ρ, δ)
-    save("decision-graph.pdf", fig)
+    #fig = Figure()
+    #scatter!(Axis(fig[1,1], title="ρ-δ Plot", xlabel="ρ", ylabel="δ"), ρ, δ)
+#
+    #save("decision-graph.pdf", fig)
     return labels
 end
 

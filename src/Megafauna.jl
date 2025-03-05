@@ -11,6 +11,8 @@ include("Scorer.jl")
 include("MakieViz.jl")
 
 
+# W2 FUNCTIONALITY
+
 function cluster_1d(X, Q, W, N, τ=100; cps=nothing)
     cps = isnothing(cps) ? compute_change_points(X, Q, W) : cps
     segment_distances = pairwise_segment_distances_1d(X, cps)
@@ -21,6 +23,57 @@ function cluster_1d(X, Q, W, N, τ=100; cps=nothing)
     return (filtered_cps, pt_labels, score)
 end
 
+function periodic_cluster_1d(X, Q, W, N; cps=nothing)
+    c(x,y) = peuclidean(x,y,1.0).^2
+    cps = isnothing(cps) ? compute_change_points_periodic(X, Q, W) : cps
+    segment_distances = pairwise_segment_distances_1d(X, cps, c)
+    labels = get_clusters(X, cps, segment_distances, N)
+    pt_labels = label_series(X, cps, labels)
+    #filtered_cps, _ = filter_change_points_from_labels(X, cps, labels)
+    score = score_labeling(pt_labels, 100)
+    return (cps, pt_labels, score)
+end
+
+function componentwise_periodic_cluster(X, Q, W, N; cps=nothing)
+    T, D = size(X)
+    dummy_vec = [10^i for i in range(D-1, 0; step=-1)]'
+    Y = zeros(T, D)
+    if isnothing(cps)
+        change_pts = []
+        for d in 1:D
+            changes, Y[:,d], _ = periodic_cluster_1d(X[:,d], Q[d], W[d], N[d])
+            cps= vcat(cps, changes)
+        end
+    end
+    sort!(change_pts)
+    series_labels = [dummy_vec * Y[t,:] for t in 1:T]
+    unique_labels = unique(series_labels)
+    labels = [findfirst(idx -> idx == label, unique_labels) for label in series_labels]
+    score = score_labeling(labels, 100)
+    println(unique(change_pts))
+    return (unique(change_pts), series_labels, score)
+end
+
+function componentwise_euclidean_cluster(X, Q, W, N; cps=nothing)
+    T, D = size(X)
+    dummy_vec = [10^i for i in range(D-1, 0; step=-1)]'
+    Y = zeros(T, D)
+    if isnothing(cps)
+        change_pts = []
+        for d in 1:D
+            changes, Y[:,d], _ = cluster_1d(X[:,d], Q[d], W[d], N[d])
+            cps = vcat(cps, changes)
+        end
+    end
+    sort!(cps)
+    series_labels = [dummy_vec * Y[t,:] for t in 1:T]
+    unique_labels = unique(series_labels)
+    labels = [findfirst(idx -> idx == label, unique_labels) for label in series_labels]
+    score = score_labeling(labels, 100)
+    return (unique(change_pts), series_labels, score)
+end
+
+# ENTROPIC FUNCTIONALITY
 
 function entropic_cluster_1d(X, Q, W, N, ε, τ=100)
     cps = compute_change_points(X, Q, W)
@@ -31,6 +84,8 @@ function entropic_cluster_1d(X, Q, W, N, ε, τ=100)
     score = score_labeling(pt_labels, τ)
     return (filtered_cps, pt_labels, score)
 end
+
+# LINEAR ENTROPIC FUNCTIONALITY
 
 function linear_entropic_cluster_QGKJL(X, Q, W, N, ε, τ=100)
     ρ = Uniform(-2,2)
@@ -66,17 +121,6 @@ function linear_entropic_cluster_presampled_mc_1d(X, Q, W, N, ε, τ=100)
     return (filtered_cps, pt_labels, score)
 end
 
-function periodic_cluster_1d(X, Q, W, N; cps=nothing)
-    c(x,y) = peuclidean(x,y,1.0).^2
-    cps = isnothing(cps) ? compute_change_points_periodic(X, Q, W) : cps
-    segment_distances = pairwise_segment_distances_1d(X, cps, c)
-    labels = get_clusters(X, cps, segment_distances, N)
-    pt_labels = label_series(X, cps, labels)
-    filtered_cps, _ = filter_change_points_from_labels(X, cps, labels)
-    score = score_labeling(pt_labels, 100)
-    return (filtered_cps, pt_labels, score)
-end
-
 function linear_entropic_cluster_periodic_presampled_mc(X, Q, W, N, ε)
     ρ = fit(MvNormal, transpose(X))
     cps = compute_change_points_periodic(X, Q, W)
@@ -87,43 +131,6 @@ function linear_entropic_cluster_periodic_presampled_mc(X, Q, W, N, ε)
     return (cps, pt_labels, score)
 end
 
-function componentwise_periodic_cluster(X, Q, W, N; cps=nothing)
-    T, D = size(X)
-    dummy_vec = [10^i for i in range(D-1, 0; step=-1)]'
-    Y = zeros(T, D)
-    if isnothing(cps)
-        change_pts = []
-        for d in 1:D
-            changes, Y[:,d], _ = periodic_cluster_1d(X[:,d], Q[d], W[d], N[d])
-            cps= vcat(cps, changes)
-        end
-    end
-    sort!(change_pts)
-    series_labels = [dummy_vec * Y[t,:] for t in 1:T]
-    unique_labels = unique(series_labels)
-    labels = [findfirst(idx -> idx == label, unique_labels) for label in series_labels]
-    score = score_labeling(labels, 100)
-    return (unique(change_pts), series_labels, score)
-end
-
-function componentwise_euclidean_cluster(X, Q, W, N; cps=nothing)
-    T, D = size(X)
-    dummy_vec = [10^i for i in range(D-1, 0; step=-1)]'
-    Y = zeros(T, D)
-    if isnothing(cps)
-        change_pts = []
-        for d in 1:D
-            changes, Y[:,d], _ = cluster_1d(X[:,d], Q[d], W[d], N[d])
-            cps = vcat(cps, changes)
-        end
-    end
-    sort!(cps)
-    series_labels = [dummy_vec * Y[t,:] for t in 1:T]
-    unique_labels = unique(series_labels)
-    labels = [findfirst(idx -> idx == label, unique_labels) for label in series_labels]
-    score = score_labeling(labels, 100)
-    return (unique(change_pts), series_labels, score)
-end
 
 function identify_change_points(X, Q, W, domain="periodic", filename="change_points.txt")
     if domain == "periodic"
@@ -155,5 +162,6 @@ function CATBOSS(X, Q, W, N; domain="periodic", cps=nothing)
 	
 end
 
+export periodic_cluster_1d, componentwise_periodic_cluster, ramachandran, scatter_timeseries
 
 end
